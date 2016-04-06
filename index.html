@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="assets/css/core.css"/>
+    <script src="./bower_components/requirejs/require.js" data-main="assets/js/application.js"></script>
+</head>
+
+<script id="field-template" type="text/x-handlebars-template">
+    <div class="grid">
+        {{#each this}}
+        <div class="grid-row">
+            {{#each cells}}
+            <div class="grid-cell js-cell-{{this}}"></div>
+            {{/each}}
+        </div>
+        {{/each}}
+    </div>
+</script>
+
+<div class="main-block">
+    <button class="js-btn1">
+        Plus
+    </button>
+</div>
+<div class="main-block">
+    <button class="js-btn2">
+        Minus
+    </button>
+</div>
+<div class="main-block">
+    <button class="js-btn3">
+        Stop
+    </button>
+</div>
+</div>
+<div class="result-block">
+    <label for="" class="result-block__label js-result"></label>
+</div>
+
+<div class="playing-field">
+
+</div>
+
+<body>
+
+</body>
+</html>

@@ -1,0 +1,15 @@
+.grid {
+    display: table;
+    border-spacing: 1px;
+}
+
+.grid-row {
+    display: table-row;
+}
+
+.grid-cell {
+    display: table-cell;
+    border: solid 1px #EEEEEE;
+    width: 6px;
+    height: 6px;
+}

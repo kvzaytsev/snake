@@ -13,7 +13,7 @@ requirejs.config({
 require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
 
     const
-        FIELD_SIZE = 40,
+        FIELD_SIZE = 30,
         INITIAL_SNAKE_SIZE = 5,
         source   = $("#field-template").html(),
         template = Handlebars.compile(source),
@@ -41,12 +41,7 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
 
         directionStream = keyStream
                 .sampledBy(updateStream)
-                .scan([0, 0], (a,b)=> {
-                    if ((a[0]+b[0]===0)&&(a[1]+b[1])===0){
-                        return a;
-                    }
-                    return b;
-                });
+                .scan([0, 0], ([x1, y1], [x2, y2])=> (x1+x2===0)&&(y1+y2)===0 ? [x1, y1] : [x2, y2]);
 
     function randomInt(min=4, max=FIELD_SIZE-5){
         return Math.floor(Math.random() * (max - min + 1)) + min;

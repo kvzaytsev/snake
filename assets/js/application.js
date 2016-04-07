@@ -41,7 +41,7 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
 
         directionStream = keyStream
                 .sampledBy(updateStream)
-                .scan([0, 0], ([x1, y1], [x2, y2])=> (x1+x2===0)&&(y1+y2===0) ? [x1, y1] : [x2, y2]);
+                .scan([0, 0], ([x1, y1], [x2, y2]) => (x1+x2===0)&&(y1+y2===0) ? [x1, y1] : [x2, y2]);
 
     function randomInt(min=4, max=FIELD_SIZE-5){
         return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -65,7 +65,7 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
         return cells.map((x, j) =>  {
             return {
                 cells:[].concat(cells.map((y)=> {
-                    return y+'-'+j;
+                    return `${y}-${j}`;
                 }))
             }
         });
@@ -88,9 +88,9 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
             return;
         }
         $('.playing-field').html(template(generateField()));
-        snake.forEach((coords) => {
-            $('.js-cell-' + coords[0] + '-' +coords[1]).css('background-color', 'blue');
+        snake.forEach(([x,y]) => {
+            $(`.js-cell-${x}-${y}`).css('background-color', 'blue');
         });
-        $('.js-cell-' + snake[0][0] + '-' +snake[0][1]).css('background-color', 'red');
+        $(`.js-cell-${snake[0][0]}-${snake[0][1]}`).css('background-color', 'red');
     }
 });

@@ -41,7 +41,7 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
 
         directionStream = keyStream
                 .sampledBy(updateStream)
-                .scan([0, 0], ([x1, y1], [x2, y2])=> (x1+x2===0)&&(y1+y2)===0 ? [x1, y1] : [x2, y2]);
+                .scan([0, 0], ([x1, y1], [x2, y2])=> (x1+x2===0)&&(y1+y2===0) ? [x1, y1] : [x2, y2]);
 
     function randomInt(min=4, max=FIELD_SIZE-5){
         return Math.floor(Math.random() * (max - min + 1)) + min;

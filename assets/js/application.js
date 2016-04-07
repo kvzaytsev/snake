@@ -1,7 +1,7 @@
 'use strict';
 
 requirejs.config({
-    baseUrl: './app',
+    baseUrl: './snake',
     paths: {
         lib: '../bower_components',
         jquery: '../bower_components/jquery/dist/jquery.min',
@@ -12,15 +12,13 @@ requirejs.config({
 
 require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
 
-    let counter = 0;
-
     const
         FIELD_SIZE = 40,
+        INITIAL_SNAKE_SIZE = 5,
         source   = $("#field-template").html(),
         template = Handlebars.compile(source),
 
         updateStream = Bacon.interval(100, 1),
-        increaseStream = Bacon.interval(1000, 1),
         keyStream = Bacon.fromEventTarget(document, 'keydown')
             .map((e) => {
                 switch (e.which){
@@ -41,20 +39,30 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
                 }
             }),
 
-    //directionStream =
         directionStream = keyStream
-            .sampledBy(updateStream);
+                .sampledBy(updateStream)
+                .scan([0, 0], (a,b)=> {
+                    if ((a[0]+b[0]===0)&&(a[1]+b[1])===0){
+                        return a;
+                    }
+                    return b;
+                });
 
     function randomInt(min=4, max=FIELD_SIZE-5){
         return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
     function randomCell(){
-        let head = [randomInt(), randomInt()],
-            body = [head[0]-1,head[1]],
-            tail = [head[0]-2,head[1]];
+        return [randomInt(), randomInt()];
+    }
 
-        return [head, body, tail];
+    function initSnake(){
+        let head = randomCell(),
+            body = [];
+        for(let i = 1; i < INITIAL_SNAKE_SIZE; i++){
+            body.push([head[0]-i, head[1]]);
+        }
+        return [head].concat(body);
     }
 
     function generateField(){
@@ -68,19 +76,14 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
         });
     }
 
-
-
     directionStream
-        .scan(randomCell(), (snake,vector)=>{
-
+        .scan(initSnake(), (snake,vector)=>{
             let head = snake[0];
             head = [
                 (vector[0] + head[0] + FIELD_SIZE) % FIELD_SIZE,
                 (vector[1] + head[1] + FIELD_SIZE) % FIELD_SIZE
             ];
-
             snake.pop();
-            counter++;
             return [head].concat(snake.length ? snake : []);
         })
         .onValue(draw);
@@ -94,8 +97,5 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
             $('.js-cell-' + coords[0] + '-' +coords[1]).css('background-color', 'blue');
         });
         $('.js-cell-' + snake[0][0] + '-' +snake[0][1]).css('background-color', 'red');
-
-
     }
-
 });

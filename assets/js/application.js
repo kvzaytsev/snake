@@ -48,7 +48,7 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
         INITIAL_SNAKE_SIZE = 5,
         source   = $("#field-template").html(),
         template = Handlebars.compile(source),
-
+        applePos = randomCell(),
         keyStream = Bacon.fromEventTarget(document, 'keydown'),
         tickStream = Bacon.interval(100, false),
         directionStream = keyStream
@@ -86,11 +86,13 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
         return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
-    function randomCell(){
+    function randomCell() {
         return [randomInt(), randomInt()];
     }
 
-    $('.playing-field').html(template(generateField()));
+    function drawGrid() {
+        $('.playing-field').html(template(generateField()));
+    }
 
     function initSnake() {
         let
@@ -104,11 +106,11 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
         return [head].concat(body);
     }
 
-    let apple = null;
     function generateApple(){
-        apple = randomCell();
         $(`.js-cell-${apple[0]}-${apple[1]}`).css('background-color', 'green');
     }
+
+    drawGrid();
 
     let
         appleBus = new Bacon.Bus(),
@@ -128,16 +130,48 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
                         (vector[1] + head[1] + FIELD_SIZE) % FIELD_SIZE
                     ];
 
+                    if (checkSelfEating(snake)){
+                        //TODO: return Bacon.Error
+                    }
+
                     return [head].concat(snake.length ? snake : []);
                 });
 
-    snakeStream.combine(appleStream, (snake, apple) => {
+    let frame = appleStream.sampledBy(snakeStream, (apple, snake) => {
+
+        if (snake.length && apple.length) {
+            let tail,
+                isApple = apple
+                    ? snake[0][0] === apple[0] && snake[0][1] === apple[1]
+                    : false;
+
+            if (!isApple) {
+                tail = snake.pop();
+                $(`.js-cell-${tail[0]}-${tail[1]}`).css('background-color', '');
+            } else {
+                appleBus.push(randomCell());
+            }
+
+            return {
+                snake: snake,
+                apple: apple
+            };
+        }
+    });
+
+    frame.onValue((toDraw)=> {
+        drawApple(toDraw.apple);
+        drawSnake(toDraw.snake);
+    });
+
+    /*const streams = [snakeStream, appleStream];
+    Bacon.combineWith(streams, (snake, apple) => {
         let tail,
             isApple = apple
                 ? snake[0][0] === apple[0] && snake[0][1] === apple[1]
                 : false;
 
-        if (!isApple) {
+        if (!isApple && ) {
             tail = snake.pop();
             $(`.js-cell-${tail[0]}-${tail[1]}`).css('background-color', '');
         }
@@ -146,19 +180,32 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
             snake: snake,
             apple: apple
         };
+    }).onValue((toDraw)=> {
+        drawApple(toDraw.apple);
+        drawSnake(toDraw.snake);
+    });*/
 
-    }).onValue(function(model){
-        drawApple(model.apple);
-        drawSnake(model.snake);
-    });
 
-    appleBus.push(randomCell());
+    function checkSelfEating(snake) {
+        let head = snake[0];
+        for (let i = 1, l = snake.length; i < l; i++) {
+            if (cellsEqual(head,snake[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function cellsEqual(c1, c2) {
+        return c1[0] === c2[0] && c1[1] === c2[1];
+    }
 
     function drawApple(apple){
         $(`.js-cell-${apple[0]}-${apple[1]}`).css('background-color', 'green');
     }
 
     function drawSnake(snake){
+        console.log(snake.length);
         snake.forEach(([x,y]) => {
             $(`.js-cell-${x}-${y}`).css('background-color', 'blue');
         });
@@ -166,4 +213,5 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
         $(`.js-cell-${snake[0][0]}-${snake[0][1]}`).css('background-color', 'red');
     }
 
+    appleBus.push(randomCell());
 });

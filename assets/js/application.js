@@ -12,64 +12,26 @@ requirejs.config({
 
 require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
 
-    /*
-    class Vector {
 
-        constructor(x, y) {
-            this.x = x;
-            this.y = y;
-        }
-
-        get x() {
-            return this.x;
-        }
-
-        set x(value) {
-            return this.x = value;
-        }
-
-        get y() {
-            return this.y;
-        }
-
-        set y(value) {
-            return this.y = value;
-        }
-
-        isZero() {
-            return this.x === 0 && this.y === 0;
-        }
-    }
-
-     */
 
     const
         FIELD_SIZE = 30,
-        INITIAL_SNAKE_SIZE = 5,
+        INITIAL_SNAKE_SIZE = 4,
+        INITIAL_SNAKE_SPEED = 200;
+
+    let GAME_SETTINGS = {
+        SPEED: INITIAL_SNAKE_SPEED
+    };
+
+    const
         source   = $("#field-template").html(),
         template = Handlebars.compile(source),
-        applePos = randomCell(),
-        keyStream = Bacon.fromEventTarget(document, 'keydown'),
-        tickStream = Bacon.interval(100, false),
-        directionStream = keyStream
-            .filter((e)=>[37,38,39,40].indexOf(e.which) !== -1)
-            .map((e) => {
-                switch (e.which){
-                    case 37:
-                        return [-1,0];
-                    case 38:
-                        return [0,-1];
-                    case 40:
-                        return [0, 1];
-                    default :
-                        return [1, 0];
-                }
-            })
-            .scan([0,0], ([x1,y1], [x2,y2]) => {
-                return (x1 + x2 === 0) && (y1 + y2 === 0)
-                    ? [x1,y1]
-                    : [x2,y2]
-            });
+        speedProperty = new Bacon.constant(INITIAL_SNAKE_SPEED);
+
+    speedProperty.assign($('.js-snake-speed'), 'text');
+
+    const
+        keyStream = Bacon.fromEventTarget(document, 'keydown');
 
     function generateField(){
         const cells = Array.apply(null, {length: FIELD_SIZE}).map(Number.call, Number);
@@ -90,6 +52,14 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
         return [randomInt(), randomInt()];
     }
 
+    function generateApple(snake) {
+        let cell = randomCell();
+        if (snake.filter((segment) => cellsEqual(cell,segment)).length > 0) {
+            return generateApple(snake);
+        }
+        return cell;
+    }
+
     function drawGrid() {
         $('.playing-field').html(template(generateField()));
     }
@@ -106,112 +76,119 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
         return [head].concat(body);
     }
 
-    function generateApple(){
-        $(`.js-cell-${apple[0]}-${apple[1]}`).css('background-color', 'green');
-    }
-
-    drawGrid();
-
-    let
-        appleBus = new Bacon.Bus(),
-        appleStream = appleBus,
-        snakeStream =
-            directionStream
-                .sampledBy(tickStream, (vector) => vector)
-                .skipWhile(([x,y]) => {
-                    return x === 0 && y === 0
-                })
-                .scan(initSnake(), (snake, vector) => {
-
-                    let head = snake[0];
-
-                    head = [
-                        (vector[0] + head[0] + FIELD_SIZE) % FIELD_SIZE,
-                        (vector[1] + head[1] + FIELD_SIZE) % FIELD_SIZE
-                    ];
-
-                    if (checkSelfEating(snake)){
-                        //TODO: return Bacon.Error
-                    }
-
-                    return [head].concat(snake.length ? snake : []);
-                });
-
-    let frame = appleStream.sampledBy(snakeStream, (apple, snake) => {
-
-        if (snake.length && apple.length) {
-            let tail,
-                isApple = apple
-                    ? snake[0][0] === apple[0] && snake[0][1] === apple[1]
-                    : false;
-
-            if (!isApple) {
-                tail = snake.pop();
-                $(`.js-cell-${tail[0]}-${tail[1]}`).css('background-color', '');
-            } else {
-                appleBus.push(randomCell());
-            }
-
-            return {
-                snake: snake,
-                apple: apple
-            };
-        }
-    });
-
-    frame.onValue((toDraw)=> {
-        drawApple(toDraw.apple);
-        drawSnake(toDraw.snake);
-    });
-
-    /*const streams = [snakeStream, appleStream];
-    Bacon.combineWith(streams, (snake, apple) => {
-        let tail,
-            isApple = apple
-                ? snake[0][0] === apple[0] && snake[0][1] === apple[1]
-                : false;
-
-        if (!isApple && ) {
-            tail = snake.pop();
-            $(`.js-cell-${tail[0]}-${tail[1]}`).css('background-color', '');
-        }
-
-        return {
-            snake: snake,
-            apple: apple
-        };
-    }).onValue((toDraw)=> {
-        drawApple(toDraw.apple);
-        drawSnake(toDraw.snake);
-    });*/
-
-
-    function checkSelfEating(snake) {
-        let head = snake[0];
-        for (let i = 1, l = snake.length; i < l; i++) {
-            if (cellsEqual(head,snake[i])) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     function cellsEqual(c1, c2) {
         return c1[0] === c2[0] && c1[1] === c2[1];
     }
 
-    function drawApple(apple){
-        $(`.js-cell-${apple[0]}-${apple[1]}`).css('background-color', 'green');
+    function checkSelfEating(snake) {
+        let segment, i, l,
+            head = snake[0];
+
+        for (i = 1, l = snake.length; i < l; i++) {
+            segment = snake[i];
+            if (cellsEqual(head,segment)) {
+                throw new Bacon.Error("Self-eating");
+            }
+        }
+    }
+
+    function checkFieldBorders([hx, hy]) {
+        if (hx < 0|| hy < 0 || hx >= FIELD_SIZE || hy >=FIELD_SIZE) {
+            throw new Bacon.Error("Out of field borders");
+        }
     }
 
     function drawSnake(snake){
-        console.log(snake.length);
         snake.forEach(([x,y]) => {
             $(`.js-cell-${x}-${y}`).css('background-color', 'blue');
+            $(`.js-cell-${x}-${y}`).css('border-color', 'blue');
         });
 
         $(`.js-cell-${snake[0][0]}-${snake[0][1]}`).css('background-color', 'red');
+        $(`.js-cell-${snake[0][0]}-${snake[0][1]}`).css('border-color', 'red');
     }
 
+    function drawApple(apple){
+        $(`.js-cell-${apple[0]}-${apple[1]}`).css('background-color', 'green');
+        $(`.js-cell-${apple[0]}-${apple[1]}`).css('border-color', 'green');
+    }
+
+    function draw(toDraw){
+        drawGrid();
+        drawApple(toDraw.apple);
+        drawSnake(toDraw.snake);
+    }
+
+    drawGrid();
+
+    const
+        appleBus = new Bacon.Bus(),
+        directionStream = keyStream
+            .filter((e)=>[37,38,39,40].indexOf(e.which) !== -1)
+            .map((e) => {
+                switch (e.which){
+                    case 37:
+                        return [-1,0];
+                    case 38:
+                        return [0,-1];
+                    case 40:
+                        return [0, 1];
+                    default :
+                        return [1, 0];
+                }
+            })
+            .scan([0,0], ([x1,y1], [x2,y2]) => {
+                return (x1 + x2 === 0) && (y1 + y2 === 0)
+                    ? [x1,y1]
+                    : [x2,y2]
+            }),
+
+        updateStream = directionStream
+            .flatMapLatest((x) => {
+                return Bacon.interval(INITIAL_SNAKE_SPEED, x).startWith(x);
+            }),
+
+        snakeStream = updateStream.scan(initSnake(), (snake, [vx,vy]) => {
+            let head = snake[0];
+
+            head = [
+                vx + head[0],
+                vy + head[1]
+            ];
+
+            //checkSelfEating(snake);
+            checkFieldBorders(head);
+
+            return [head].concat(snake.length ? snake : []);
+
+        }),
+        finalStream = appleBus.sampledBy(snakeStream, (apple, snake) => {
+
+            let tail,
+                isApple = apple
+                    ? cellsEqual(apple, snake[0])
+                    : false;
+
+            if (!isApple) {
+                tail = snake.pop();
+            } else {
+                appleBus.push(generateApple(snake));
+            }
+
+            return {
+                apple: apple,
+                snake: snake
+            }
+        });
+
+    finalStream.onError((error)=>{
+        alert(error);
+    });
+
+    finalStream.map((obj) => {
+        return obj.snake.length;
+    }).assign($('.js-snake-length'), 'text');
+
+    finalStream.onValue(draw);
     appleBus.push(randomCell());
 });

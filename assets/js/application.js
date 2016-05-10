@@ -8,13 +8,13 @@ require(['jquery','utils', 'graphics', 'bacon'], function ($, _, graphics) {
             RIGHT : 39,
             DOWN : 40
         },
+        EMPTY_STRING = '',
         DIRECTION_KEYS = [KEYS.LEFT,KEYS.RIGHT,KEYS.UP,KEYS.DOWN],
         initDirection = _.randomDirection(),
         initSnake = _.initSnake(initDirection),
         initSpeed = 300;
 
     graphics.drawGrid();
-    //graphics.drawSnake(initSnake);
 
     const
         speedB = new Bacon.Bus(),
@@ -99,6 +99,8 @@ require(['jquery','utils', 'graphics', 'bacon'], function ($, _, graphics) {
             if (isApple) {
                 snake[snake.length]=apple;
                 appleB.push(_.generateApple(snake));
+
+                // TODO: ugly
                 speedB.push(initSpeed - Math.floor(snake.length / 5) * 25);
             }
 
@@ -129,9 +131,9 @@ require(['jquery','utils', 'graphics', 'bacon'], function ($, _, graphics) {
 
     speedP.assign($('.js-snake-speed'), 'text');
     pausedP.map((v) => {
-        return !v
-            ? "paused"
-            : ""
+        return v
+            ? EMPTY_STRING
+            : 'paused'
     }).assign($('.js-status'), 'text');
 
     appleB.push(_.randomCell());

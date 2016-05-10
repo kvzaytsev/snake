@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title></title>
     <link rel="stylesheet" type="text/css" href="assets/css/core.css"/>
-    <script src="./bower_components/requirejs/require.js" data-main="assets/js/application.js"></script>
+    <script src="./bower_components/requirejs/require.js" data-main="assets/js/main.js"></script>
 </head>
 
 <script id="field-template" type="text/x-handlebars-template">
@@ -19,21 +19,32 @@
     </div>
 </script>
 
-<div class="playing-field">
-
-</div>
-
-<div class="score">
-    <div>
-        <span>Current length:</span><span class="js-snake-length"/>
-    </div>
-    <div>
-        <span>Current speed:</span><span class="js-snake-speed"/>
-    </div>
-</div>
-
-
 <body>
+
+<div class="main">
+    <div class="score">
+        <div class="score-part score-part__length">
+            <span>Current length:</span><span class="js-snake-length"/>
+        </div>
+        <div  class="score-part score-part__speed">
+            <span>Current speed:</span><span class="js-snake-speed"/>
+        </div>
+    </div>
+    <div class="field">
+        <div class="notifications-layer">
+            <span class="notifications-layer__message js-message"></span>
+        </div>
+        <div class="playing-layer"></div>
+    </div>
+    <div class="status">
+        <div class="status-part">
+            <span>Press Space to start/pause/continue</span>
+        </div>
+        <div class="status-part">
+            <span class="js-status">Press Space to start</span>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>

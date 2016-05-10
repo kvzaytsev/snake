@@ -1,178 +1,105 @@
-
-
-requirejs.config({
-    baseUrl: './snake',
-    paths: {
-        lib: '../bower_components',
-        jquery: '../bower_components/jquery/dist/jquery.min',
-        bacon: '../bower_components/bacon/dist/Bacon.min',
-        handlebars: '../bower_components/handlebars/handlebars.amd.min'
-    }
-});
-
-require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
-
-
+require(['jquery','utils', 'graphics', 'bacon'], function ($, _, graphics) {
 
     const
-        FIELD_SIZE = 30,
-        INITIAL_SNAKE_SIZE = 4,
-        INITIAL_SNAKE_SPEED = 200;
+        KEYS = {
+            SPACE : 32,
+            LEFT : 37,
+            UP : 38,
+            RIGHT : 39,
+            DOWN : 40
+        },
+        DIRECTION_KEYS = [KEYS.LEFT,KEYS.RIGHT,KEYS.UP,KEYS.DOWN],
+        initDirection = _.randomDirection(),
+        initSnake = _.initSnake(initDirection),
+        initSpeed = 300;
 
-    let GAME_SETTINGS = {
-        SPEED: INITIAL_SNAKE_SPEED
-    };
-
-    const
-        source   = $("#field-template").html(),
-        template = Handlebars.compile(source),
-        speedProperty = new Bacon.constant(INITIAL_SNAKE_SPEED);
-
-    speedProperty.assign($('.js-snake-speed'), 'text');
-
-    const
-        keyStream = Bacon.fromEventTarget(document, 'keydown');
-
-    function generateField(){
-        const cells = Array.apply(null, {length: FIELD_SIZE}).map(Number.call, Number);
-        return cells.map((x, j) =>  {
-            return {
-                cells:[].concat(cells.map((y)=> {
-                    return `${y}-${j}`;
-                }))
-            }
-        });
-    }
-
-    function randomInt(min=4, max=FIELD_SIZE-5){
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
-
-    function randomCell() {
-        return [randomInt(), randomInt()];
-    }
-
-    function generateApple(snake) {
-        let cell = randomCell();
-        if (snake.filter((segment) => cellsEqual(cell,segment)).length > 0) {
-            return generateApple(snake);
-        }
-        return cell;
-    }
-
-    function drawGrid() {
-        $('.playing-field').html(template(generateField()));
-    }
-
-    function initSnake() {
-        let
-            head = randomCell(),
-            body = [];
-
-        for (let i = 1; i < INITIAL_SNAKE_SIZE; i++ ) {
-            body.push([head[0]-i, head[1]]);
-        }
-
-        return [head].concat(body);
-    }
-
-    function cellsEqual(c1, c2) {
-        return c1[0] === c2[0] && c1[1] === c2[1];
-    }
-
-    function checkSelfEating(snake) {
-        let segment, i, l,
-            head = snake[0];
-
-        for (i = 1, l = snake.length; i < l; i++) {
-            segment = snake[i];
-            if (cellsEqual(head,segment)) {
-                throw new Bacon.Error("Self-eating");
-            }
-        }
-    }
-
-    function checkFieldBorders([hx, hy]) {
-        if (hx < 0|| hy < 0 || hx >= FIELD_SIZE || hy >=FIELD_SIZE) {
-            throw new Bacon.Error("Out of field borders");
-        }
-    }
-
-    function drawSnake(snake){
-        snake.forEach(([x,y]) => {
-            $(`.js-cell-${x}-${y}`).css('background-color', 'blue');
-            $(`.js-cell-${x}-${y}`).css('border-color', 'blue');
-        });
-
-        $(`.js-cell-${snake[0][0]}-${snake[0][1]}`).css('background-color', 'red');
-        $(`.js-cell-${snake[0][0]}-${snake[0][1]}`).css('border-color', 'red');
-    }
-
-    function drawApple(apple){
-        $(`.js-cell-${apple[0]}-${apple[1]}`).css('background-color', 'green');
-        $(`.js-cell-${apple[0]}-${apple[1]}`).css('border-color', 'green');
-    }
-
-    function draw(toDraw){
-        drawGrid();
-        drawApple(toDraw.apple);
-        drawSnake(toDraw.snake);
-    }
-
-    drawGrid();
+    graphics.drawGrid();
+    //graphics.drawSnake(initSnake);
 
     const
-        appleBus = new Bacon.Bus(),
-        directionStream = keyStream
-            .filter((e)=>[37,38,39,40].indexOf(e.which) !== -1)
-            .map((e) => {
+        speedB = new Bacon.Bus(),
+        appleB = new Bacon.Bus(),
+        keyboardS = Bacon.fromEventTarget(document, 'keydown'),
+        //startedP = Bacon.sequentially(1000, [3, 2,1,0]).toProperty(),
+        pausedP = keyboardS
+            .startWith(false)
+            //.skipWhile(startedP)
+            .filter((e) => e.which === KEYS.SPACE)
+            .scan(false, (v) => !v)
+            .toProperty(),
+        directionS = keyboardS
+            .filter(pausedP)
+            .filter((e) => DIRECTION_KEYS.includes(e.which))
+            .flatMap((e) => {
                 switch (e.which){
-                    case 37:
+                    case KEYS.LEFT:
                         return [-1,0];
-                    case 38:
+                        break;
+                    case KEYS.UP:
                         return [0,-1];
-                    case 40:
+                        break;
+                    case KEYS.DOWN:
                         return [0, 1];
-                    default :
+                        break;
+                    case KEYS.RIGHT:
                         return [1, 0];
+                        break;
                 }
             })
-            .scan([0,0], ([x1,y1], [x2,y2]) => {
+            .skipDuplicates()
+            .scan(initDirection, ([x1,y1], [x2,y2]) => {
                 return (x1 + x2 === 0) && (y1 + y2 === 0)
                     ? [x1,y1]
                     : [x2,y2]
             }),
 
-        updateStream = directionStream
-            .flatMapLatest((x) => {
-                return Bacon.interval(INITIAL_SNAKE_SPEED, x).startWith(x);
-            }),
+        speedP = speedB.toProperty(initSpeed),
+        updateS = speedP
+            //.startWith(initDirection)
+            .sampledBy(directionS, (s,v) => {
+                return [v,s];
+            })
+            .flatMapLatest(([v,s]) => {
+                return Bacon
+                    .interval(s, v)
+                    .startWith(v);
+            })
+            //.skipWhile(startedP)
+            .filter(pausedP),
 
-        snakeStream = updateStream.scan(initSnake(), (snake, [vx,vy]) => {
-            let head = snake[0];
+        snakeS = updateS
+            .scan(initSnake, (snake, [vx,vy]) => {
+                let head = snake[0];
 
-            head = [
-                vx + head[0],
-                vy + head[1]
-            ];
+                head = [
+                    vx + head[0],
+                    vy + head[1]
+                ];
 
-            //checkSelfEating(snake);
-            checkFieldBorders(head);
+                snake.pop();
+                snake = [head].concat(snake.length ? snake : []);
 
-            return [head].concat(snake.length ? snake : []);
+                return snake;
+            }).flatMap((snake) => {
+                try {
+                    _.checkSelfEating(snake);
+                    _.checkFieldBorders(snake[0]);
+                } catch (e) {
+                    console.log('Fail: ', e.error);
+                    return e;
+                }
+                return snake
+            })
+            .endOnError(),
+        combinedS = appleB.sampledBy(snakeS, (apple, snake) => {
+            let isApple = apple
+                ? _.cellsEqual(apple, snake[0])
+                : false;
 
-        }),
-        finalStream = appleBus.sampledBy(snakeStream, (apple, snake) => {
-
-            let tail,
-                isApple = apple
-                    ? cellsEqual(apple, snake[0])
-                    : false;
-
-            if (!isApple) {
-                tail = snake.pop();
-            } else {
-                appleBus.push(generateApple(snake));
+            if (isApple) {
+                snake[snake.length]=apple;
+                appleB.push(_.generateApple(snake));
+                speedB.push(initSpeed - Math.floor(snake.length / 5) * 25);
             }
 
             return {
@@ -181,14 +108,31 @@ require(['jquery','bacon','handlebars'], function ($, bcn, Handlebars) {
             }
         });
 
-    finalStream.onError((error)=>{
-        alert(error);
+    snakeS.onValue((snake) => graphics.drawSnake(snake));
+    snakeS.onError((e) => {
+    });
+    snakeS.onEnd((e) => {
+
+        // TODO: wrap this piece of shit into applicable construction
+        $('.playing-layer').css('opacity', 0.4);
+        $('.playing-layer .grid-cell').css('border', 'solid 1px rgba(238,238,238,.4)');
+        $('.js-message').text('game over');
     });
 
-    finalStream.map((obj) => {
-        return obj.snake.length;
-    }).assign($('.js-snake-length'), 'text');
+    appleB.onValue((apple) => graphics.drawApple(apple));
+    combinedS.onValue((x) => graphics.draw(x));
+    snakeS
+        .flatMap((snake) => {
+            return snake.length;
+        })
+        .assign($('.js-snake-length'), 'text');
 
-    finalStream.onValue(draw);
-    appleBus.push(randomCell());
+    speedP.assign($('.js-snake-speed'), 'text');
+    pausedP.map((v) => {
+        return !v
+            ? "paused"
+            : ""
+    }).assign($('.js-status'), 'text');
+
+    appleB.push(_.randomCell());
 });
